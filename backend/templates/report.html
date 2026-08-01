@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Security Report — {{ scan.filename }}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    :root {
+      --bg-primary:   #0a0e1a;
+      --bg-card:      #111827;
+      --bg-card2:     #1a2235;
+      --accent-cyan:  #00d4ff;
+      --accent-green: #00ff94;
+      --error:        #ff4d6d;
+      --warning:      #ffb703;
+      --info:         #4cc9f0;
+      --text-primary: #e2e8f0;
+      --text-muted:   #94a3b8;
+      --border:       #1e3a5f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      padding: 40px 24px;
+    }
+
+    /* ── Header ── */
+    .report-header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      margin-bottom: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    .report-header::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 70% 50%, rgba(0,212,255,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,212,255,0.12);
+      border: 1px solid rgba(0,212,255,0.3);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .report-title {
+      font-size: 32px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff 0%, var(--accent-cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+    .report-meta {
+      color: var(--text-muted);
+      font-size: 14px;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .report-meta span { display: flex; align-items: center; gap: 6px; }
+
+    /* ── Summary cards ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .summary-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 20px;
+      text-align: center;
+    }
+    .summary-card .count {
+      font-size: 42px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .summary-card .label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+    }
+    .count-total   { color: var(--accent-cyan); }
+    .count-error   { color: var(--error); }
+    .count-warning { color: var(--warning); }
+    .count-info    { color: var(--info); }
+
+    /* ── Section heading ── */
+    .section-heading {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ── Finding card ── */
+    .finding-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .finding-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--bg-card2);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .finding-rule {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--accent-cyan);
+      font-weight: 500;
+    }
+    .severity-badge {
+      padding: 4px 12px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .sev-ERROR   { background: rgba(255,77,109,0.15); color: var(--error);   border: 1px solid rgba(255,77,109,0.4); }
+    .sev-WARNING { background: rgba(255,183,3,0.15);  color: var(--warning); border: 1px solid rgba(255,183,3,0.4); }
+    .sev-INFO    { background: rgba(76,201,240,0.15); color: var(--info);    border: 1px solid rgba(76,201,240,0.4); }
+
+    .finding-body { padding: 20px; }
+
+    .meta-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .meta-row strong { color: var(--text-primary); }
+
+    .finding-message {
+      background: rgba(0,212,255,0.05);
+      border-left: 3px solid var(--accent-cyan);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      font-size: 14px;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    .subsection-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    pre {
+      background: #060d1a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #a8d8a8;
+      margin-bottom: 16px;
+    }
+    pre.fix-code { color: #90e0ef; }
+
+    .ai-explanation {
+      background: rgba(0,255,148,0.04);
+      border: 1px solid rgba(0,255,148,0.15);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+    }
+
+    .references {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .ref-link {
+      font-size: 12px;
+      color: var(--accent-cyan);
+      text-decoration: none;
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 6px;
+      padding: 4px 10px;
+    }
+    .ref-link:hover { background: rgba(0,212,255,0.16); }
+
+    /* ── No findings ── */
+    .no-findings {
+      background: var(--bg-card);
+      border: 1px solid rgba(0,255,148,0.2);
+      border-radius: 12px;
+      padding: 48px;
+      text-align: center;
+      color: var(--accent-green);
+    }
+    .no-findings .check-icon { font-size: 48px; margin-bottom: 16px; }
+
+    /* ── Footer ── */
+    .report-footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="report-header">
+    <div class="header-badge">🛡 Security Report</div>
+    <h1 class="report-title">{{ scan.filename }}</h1>
+    <div class="report-meta">
+      <span>📋 Scan ID: <strong>{{ scan.scan_id }}</strong></span>
+      <span>📅 Scanned: <strong>{{ scan.scanned_at }}</strong></span>
+      <span>🕐 Generated: <strong>{{ generated_at }}</strong></span>
+      <span>📊 Status: <strong>{{ scan.status }}</strong></span>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="count count-total">{{ scan.summary.total }}</div>
+      <div class="label">Total Issues</div>
+    </div>
+    <div class="summary-card">
+      <div class="count count-error">{{ scan.summary.errors }}</div>
+      <div class="label">Critical / Errors</div>
+    </div>
+    <div class="summary-card">
+      <div class="count count-warning">{{ scan.summary.warnings }}</div>
+      <div class="label">Warnings</div>
+    </div>
+    <div class="summary-card">
+      <div class="count count-info">{{ scan.summary.info }}</div>
+      <div class="label">Informational</div>
+    </div>
+  </div>
+
+  <!-- Findings -->
+  <h2 class="section-heading">🔍 Vulnerability Findings</h2>
+
+  {% if scan.findings %}
+    {% for finding in scan.findings %}
+    <div class="finding-card">
+      <div class="finding-header">
+        <span class="finding-rule">{{ finding.rule_id }}</span>
+        <span class="severity-badge sev-{{ finding.severity }}">{{ finding.severity }}</span>
+      </div>
+      <div class="finding-body">
+
+        <!-- Meta row -->
+        <div class="meta-row">
+          {% if finding.cwe %}
+          <span>🔖 CWE: <strong>{{ finding.cwe }}</strong></span>
+          {% endif %}
+          {% if finding.owasp %}
+          <span>⚠️ OWASP: <strong>{{ finding.owasp }}</strong></span>
+          {% endif %}
+          <span>📄 File: <strong>{{ finding.file }}</strong></span>
+          <span>📍 Lines: <strong>{{ finding.line_start }}–{{ finding.line_end }}</strong></span>
+        </div>
+
+        <!-- Semgrep message -->
+        <div class="finding-message">{{ finding.message }}</div>
+
+        <!-- Vulnerable snippet -->
+        {% if finding.code_snippet %}
+        <div class="subsection-label">🚨 Vulnerable Code</div>
+        <pre>{{ finding.code_snippet }}</pre>
+        {% endif %}
+
+        <!-- AI Explanation -->
+        {% if finding.ai_explanation %}
+        <div class="subsection-label">🤖 AI Explanation</div>
+        <div class="ai-explanation">{{ finding.ai_explanation }}</div>
+        {% endif %}
+
+        <!-- AI Fix -->
+        {% if finding.ai_fix %}
+        <div class="subsection-label">✅ Secure Fix</div>
+        <pre class="fix-code">{{ finding.ai_fix }}</pre>
+        {% endif %}
+
+        <!-- References -->
+        {% if finding.references %}
+        <div class="subsection-label">📚 References</div>
+        <div class="references">
+          {% for ref in finding.references %}
+          <a class="ref-link" href="{{ ref }}" target="_blank" rel="noopener">{{ ref }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="no-findings">
+      <div class="check-icon">✅</div>
+      <h3>No vulnerabilities detected</h3>
+      <p style="margin-top:8px; color: #64748b;">
+        Semgrep found no issues with the configured ruleset. Consider running additional rule packs.
+      </p>
+    </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div class="report-footer">
+    Generated by <strong>AI Secure Code Reviewer</strong> &nbsp;|&nbsp;
+    Powered by Semgrep + LangChain + OpenAI &nbsp;|&nbsp; {{ generated_at }}
+  </div>
+
+</body>
+</html>
