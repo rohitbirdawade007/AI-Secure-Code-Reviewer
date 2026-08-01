@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Secure Code Reviewer | Detect & Fix Vulnerabilities</title>
+  <meta name="description" content="AI-powered Python code security scanner. Upload code or paste a GitHub URL to detect vulnerabilities with Semgrep and get AI-generated fix suggestions." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ─── Animated background ─────────────────────────────────────────── -->
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow glow-1" aria-hidden="true"></div>
+  <div class="bg-glow glow-2" aria-hidden="true"></div>
+
+  <!-- ─── Navbar ──────────────────────────────────────────────────────── -->
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="nav-brand">
+      <span class="nav-icon">🛡</span>
+      <span class="nav-title">AI Secure Code Reviewer</span>
+    </div>
+    <div class="nav-links">
+      <a href="#scanner" class="nav-link">Scanner</a>
+      <a href="#results" class="nav-link">Results</a>
+      <a href="http://localhost:8000/docs" target="_blank" rel="noopener" class="nav-link">API Docs</a>
+    </div>
+  </nav>
+
+  <!-- ─── Hero ────────────────────────────────────────────────────────── -->
+  <header class="hero" id="home">
+    <div class="hero-badge">
+      <span class="badge-dot"></span>
+      Powered by Semgrep + LangChain + OpenAI
+    </div>
+    <h1 class="hero-title">
+      Find &amp; Fix Code<br />
+      <span class="gradient-text">Vulnerabilities</span> with AI
+    </h1>
+    <p class="hero-subtitle">
+      Upload Python code or paste a GitHub URL. Semgrep detects security issues.
+      GPT-4o explains them and generates hardened fixes — instantly.
+    </p>
+    <div class="hero-stats">
+      <div class="stat-chip">🔍 OWASP Top 10</div>
+      <div class="stat-chip">🔖 CWE Detection</div>
+      <div class="stat-chip">🤖 AI Fix Suggestions</div>
+      <div class="stat-chip">📄 PDF Reports</div>
+    </div>
+  </header>
+
+  <!-- ─── Scanner Panel ────────────────────────────────────────────────── -->
+  <main>
+    <section class="scanner-section" id="scanner">
+      <div class="container">
+
+        <!-- Input mode tabs -->
+        <div class="tab-bar" role="tablist">
+          <button class="tab-btn active" id="tab-upload" role="tab" aria-selected="true" aria-controls="panel-upload" onclick="switchTab('upload')">
+            📁 Upload File
+          </button>
+          <button class="tab-btn" id="tab-github" role="tab" aria-selected="false" aria-controls="panel-github" onclick="switchTab('github')">
+            🐙 GitHub URL
+          </button>
+        </div>
+
+        <!-- Upload panel -->
+        <div class="tab-panel active" id="panel-upload" role="tabpanel">
+          <div class="drop-zone" id="dropZone"
+               ondrop="handleDrop(event)"
+               ondragover="handleDragOver(event)"
+               ondragleave="handleDragLeave(event)"
+               onclick="document.getElementById('fileInput').click()"
+               tabindex="0"
+               role="button"
+               aria-label="Upload Python file">
+            <div class="drop-icon">🐍</div>
+            <p class="drop-title">Drag &amp; drop your <code>.py</code> file here</p>
+            <p class="drop-sub">or click to browse</p>
+            <div class="drop-hint" id="dropHint">Max 10 MB · Python files only</div>
+          </div>
+          <input type="file" id="fileInput" accept=".py" style="display:none" onchange="handleFileSelect(event)" />
+        </div>
+
+        <!-- GitHub panel -->
+        <div class="tab-panel" id="panel-github" role="tabpanel">
+          <div class="github-input-wrap">
+            <span class="github-icon">🐙</span>
+            <input
+              type="url"
+              id="githubUrl"
+              class="github-input"
+              placeholder="https://github.com/owner/repo/blob/main/path/to/file.py"
+              aria-label="GitHub repository URL"
+            />
+          </div>
+          <p class="input-hint">Paste a GitHub blob URL to a Python file. Public repos work without a token.</p>
+        </div>
+
+        <!-- Model selector + scan button -->
+        <div class="scan-controls">
+          <div class="model-select-wrap">
+            <label for="modelSelect" class="model-label">🤖 AI Model</label>
+            <select id="modelSelect" class="model-select" aria-label="Select AI model">
+              <option value="gpt-4o">GPT-4o (Recommended)</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+              <option value="ollama/llama3">Llama 3 (Local Ollama)</option>
+            </select>
+          </div>
+          <button class="scan-btn" id="scanBtn" onclick="startScan()" aria-label="Start security scan">
+            <span class="btn-icon">⚡</span>
+            <span class="btn-text">Scan for Vulnerabilities</span>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─── Progress ─────────────────────────────────────────────────── -->
+    <section class="progress-section" id="progressSection" style="display:none" aria-live="polite">
+      <div class="container">
+        <div class="progress-card">
+          <div class="scan-animation">
+            <div class="scan-ring"></div>
+            <div class="scan-ring ring-2"></div>
+            <div class="scan-ring ring-3"></div>
+            <span class="scan-icon-center">🔍</span>
+          </div>
+          <h3 class="progress-title">Scanning your code…</h3>
+          <p class="progress-sub" id="progressMsg">Running Semgrep static analysis</p>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="progress-steps" id="progressSteps">
+            <div class="pstep active" id="pstep-1">📋 Validating file</div>
+            <div class="pstep" id="pstep-2">🔍 Running Semgrep</div>
+            <div class="pstep" id="pstep-3">🤖 AI Analysis</div>
+            <div class="pstep" id="pstep-4">✅ Done</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Results ──────────────────────────────────────────────────── -->
+    <section class="results-section" id="results" style="display:none">
+      <div class="container">
+
+        <!-- Result summary bar -->
+        <div class="result-header">
+          <div class="result-title-wrap">
+            <h2 class="result-title">Scan Results</h2>
+            <span class="result-file" id="resultFilename"></span>
+          </div>
+          <div class="result-actions">
+            <button class="action-btn" id="reportHtmlBtn" onclick="downloadReport('html')" aria-label="Download HTML report">
+              📄 HTML Report
+            </button>
+            <button class="action-btn action-btn-pdf" id="reportPdfBtn" onclick="downloadReport('pdf')" aria-label="Download PDF report">
+              📑 PDF Report
+            </button>
+            <button class="action-btn action-btn-rescan" onclick="resetUI()" aria-label="Scan another file">
+              🔄 New Scan
+            </button>
+          </div>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="summary-grid" id="summaryGrid"></div>
+
+        <!-- Finding cards -->
+        <div class="findings-list" id="findingsList"></div>
+
+      </div>
+    </section>
+
+    <!-- ─── Error toast ──────────────────────────────────────────────── -->
+    <div class="toast" id="errorToast" role="alert" aria-live="assertive" style="display:none">
+      <span class="toast-icon">❌</span>
+      <span id="toastMsg">An error occurred.</span>
+      <button class="toast-close" onclick="closeToast()" aria-label="Close error">✕</button>
+    </div>
+
+  </main>
+
+  <!-- ─── Footer ──────────────────────────────────────────────────────── -->
+  <footer class="footer">
+    <p>
+      Built with ❤️ using <strong>FastAPI</strong> · <strong>Semgrep</strong> · <strong>LangChain</strong> · <strong>OpenAI</strong>
+      &nbsp;|&nbsp; <a href="https://github.com/rohitbirdawade007/AI-Secure-Code-Reviewer" target="_blank" rel="noopener">GitHub</a>
+    </p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
