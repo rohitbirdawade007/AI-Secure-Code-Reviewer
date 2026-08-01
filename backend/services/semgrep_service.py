@@ -8,6 +8,7 @@ output into structured VulnerabilityFinding objects.
 import json
 import subprocess
 import logging
+import sys
 from pathlib import Path
 from typing import List
 
@@ -60,8 +61,12 @@ def run_semgrep(file_path: str) -> List[VulnerabilityFinding]:
     if not path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
+    # Use the same Python interpreter that's running the server,
+    # so we always pick up the venv-installed semgrep.
+    semgrep_cmd = [sys.executable, "-m", "semgrep"]
+
     cmd = [
-        "semgrep",
+        *semgrep_cmd,
         "--config", settings.semgrep_config,
         "--json",
         "--timeout", str(settings.semgrep_timeout),
@@ -76,6 +81,8 @@ def run_semgrep(file_path: str) -> List[VulnerabilityFinding]:
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=settings.semgrep_timeout + 10,
         )
     except FileNotFoundError:
