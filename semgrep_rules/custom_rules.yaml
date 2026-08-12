@@ -2,14 +2,18 @@ rules:
 
   # ── SQL Injection ──────────────────────────────────────────────────────────
   - id: custom-sql-injection
-    patterns:
-      - pattern: |
-          $DB.execute("..." + $VAR)
-      - pattern: |
-          $DB.execute(f"...{$VAR}...")
+    pattern-either:
+      - pattern: $DB.execute("..." + $VAR)
+      - pattern: $DB.execute($QUERY + $VAR)
+      - patterns:
+          - pattern: |
+              $QUERY = $PREFIX + $VAR
+              ...
+              $DB.execute($QUERY)
+          - pattern-not: $DB.execute("...")
     message: |
       Potential SQL Injection: user-controlled data passed directly into a SQL query.
-      Use parameterized queries instead: cursor.execute("SELECT * FROM t WHERE id = ?", (val,))
+      Use parameterized queries: cursor.execute("SELECT * FROM t WHERE id = ?", (val,))
     languages: [python]
     severity: ERROR
     metadata:
@@ -19,14 +23,15 @@ rules:
 
   # ── Command Injection ──────────────────────────────────────────────────────
   - id: custom-command-injection
-    patterns:
-      - pattern: os.system($VAR)
-      - pattern: subprocess.call($VAR, shell=True)
-      - pattern: subprocess.run($VAR, shell=True)
-      - pattern: os.popen($VAR)
+    pattern-either:
+      - pattern: os.system($CMD)
+      - pattern: os.popen($CMD)
+      - pattern: subprocess.call($CMD, shell=True)
+      - pattern: subprocess.run($CMD, shell=True)
+      - pattern: subprocess.Popen($CMD, shell=True)
     message: |
-      Potential Command Injection: user input passed to a shell command.
-      Avoid shell=True and use a list of arguments instead.
+      Potential Command Injection: user input may be passed to a shell command.
+      Avoid shell=True and pass arguments as a list instead.
     languages: [python]
     severity: ERROR
     metadata:
@@ -34,13 +39,16 @@ rules:
       owasp: "A03:2021 - Injection"
       category: security
 
-  # ── Hardcoded Passwords ───────────────────────────────────────────────────
+  # ── Hardcoded Passwords / Secrets ─────────────────────────────────────────
   - id: custom-hardcoded-password
-    patterns:
+    pattern-either:
       - pattern: password = "..."
       - pattern: passwd = "..."
       - pattern: secret = "..."
       - pattern: api_key = "..."
+      - pattern: token = "..."
+      - pattern: PASSWORD = "..."
+      - pattern: SECRET_KEY = "..."
     message: |
       Hardcoded secret detected. Move credentials to environment variables
       and load them with os.environ or python-dotenv.
@@ -53,12 +61,15 @@ rules:
 
   # ── Path Traversal ────────────────────────────────────────────────────────
   - id: custom-path-traversal
-    patterns:
-      - pattern: open($VAR)
-      - pattern: open(os.path.join(..., $VAR))
+    pattern-either:
+      - pattern: open($BASE + $USERVAL)
+      - pattern: open(os.path.join($BASE, $USERVAL))
+      - patterns:
+          - pattern: open($PATH)
+          - pattern-not: open("...")
     message: |
-      Potential Path Traversal: user-controlled variable used in file open.
-      Validate and sanitize the path, and restrict it to an allowed directory.
+      Potential Path Traversal: a variable is used directly in a file open call.
+      Validate and sanitize the path and restrict it to an allowed base directory.
     languages: [python]
     severity: WARNING
     metadata:
@@ -68,12 +79,14 @@ rules:
 
   # ── Insecure Deserialization ──────────────────────────────────────────────
   - id: custom-insecure-pickle
-    patterns:
+    pattern-either:
       - pattern: pickle.loads($DATA)
       - pattern: pickle.load($FILE)
+      - pattern: cPickle.loads($DATA)
+      - pattern: cPickle.load($FILE)
     message: |
       Insecure Deserialization via pickle. Never deserialize untrusted data with pickle.
-      Use safe alternatives like json.loads() for untrusted input.
+      Use json.loads() or another safe format for untrusted input.
     languages: [python]
     severity: ERROR
     metadata:
@@ -83,11 +96,12 @@ rules:
 
   # ── Weak Hashing ──────────────────────────────────────────────────────────
   - id: custom-weak-hash
-    patterns:
+    pattern-either:
       - pattern: hashlib.md5(...)
       - pattern: hashlib.sha1(...)
+      - pattern: md5(...)
     message: |
-      Weak cryptographic hash function used (MD5/SHA1).
+      Weak cryptographic hash function (MD5/SHA1) detected.
       Use SHA-256 or SHA-3 for security-sensitive hashing.
     languages: [python]
     severity: WARNING
@@ -98,13 +112,14 @@ rules:
 
   # ── Insecure Random ───────────────────────────────────────────────────────
   - id: custom-insecure-random
-    patterns:
+    pattern-either:
       - pattern: random.random()
       - pattern: random.randint(...)
       - pattern: random.choice(...)
+      - pattern: random.randrange(...)
     message: |
-      Insecure pseudo-random number generator used.
-      For security purposes (tokens, passwords), use secrets.token_hex() or secrets.token_bytes().
+      Cryptographically weak PRNG used. For security tokens/passwords,
+      use secrets.token_hex() or secrets.token_bytes() instead.
     languages: [python]
     severity: WARNING
     metadata:
@@ -112,15 +127,30 @@ rules:
       owasp: "A02:2021 - Cryptographic Failures"
       category: security
 
-  # ── Debug Mode in Flask ───────────────────────────────────────────────────
+  # ── Flask Debug Mode ──────────────────────────────────────────────────────
   - id: custom-flask-debug-true
     pattern: app.run(..., debug=True, ...)
     message: |
-      Flask debug mode is enabled. Never run with debug=True in production —
-      it exposes the interactive debugger and allows arbitrary code execution.
+      Flask debug=True must never be used in production.
+      It exposes the interactive debugger and allows arbitrary code execution.
     languages: [python]
     severity: ERROR
     metadata:
       cwe: "CWE-489: Active Debug Code"
       owasp: "A05:2021 - Security Misconfiguration"
+      category: security
+
+  # ── Use of eval ───────────────────────────────────────────────────────────
+  - id: custom-eval-injection
+    pattern-either:
+      - pattern: eval($CODE)
+      - pattern: exec($CODE)
+    message: |
+      Use of eval()/exec() with a variable is dangerous and can allow
+      arbitrary code execution if user input reaches it.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+      owasp: "A03:2021 - Injection"
       category: security

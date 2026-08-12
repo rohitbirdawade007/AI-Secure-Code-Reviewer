@@ -13,7 +13,10 @@ class Settings(BaseSettings):
 
     # Semgrep
     semgrep_timeout: int = 60
-    semgrep_config: str = "auto"        # semgrep ruleset: "auto", "p/python", etc.
+    # "semgrep_rules/custom_rules.yaml" = fast offline local rules (default).
+    # "auto" = full Semgrep registry (needs internet, slower first run).
+    # Set SEMGREP_CONFIG=auto in .env to use registry rules.
+    semgrep_config: str = "semgrep_rules/custom_rules.yaml"
 
     # Upload limits
     max_upload_size_mb: int = 10

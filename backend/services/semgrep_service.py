@@ -73,6 +73,7 @@ def run_semgrep(file_path: str) -> List[VulnerabilityFinding]:
         "--json",
         "--timeout", str(settings.semgrep_timeout),
         "--no-git-ignore",
+        "--disable-version-check",   # skip slow network version check on every run
         str(path),
     ]
 
@@ -85,7 +86,7 @@ def run_semgrep(file_path: str) -> List[VulnerabilityFinding]:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=settings.semgrep_timeout + 10,
+            timeout=settings.semgrep_timeout + 120,  # extra headroom for first-run rule download
         )
     except FileNotFoundError:
         raise RuntimeError(
