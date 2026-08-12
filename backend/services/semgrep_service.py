@@ -61,12 +61,14 @@ def run_semgrep(file_path: str) -> List[VulnerabilityFinding]:
     if not path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    # Use the same Python interpreter that's running the server,
-    # so we always pick up the venv-installed semgrep.
-    semgrep_cmd = [sys.executable, "-m", "semgrep"]
+    # Resolve the semgrep binary from the same venv as the running Python.
+    # On Windows the binary has a .exe extension.
+    venv_bin = Path(sys.executable).parent
+    semgrep_exe = venv_bin / ("semgrep.exe" if sys.platform == "win32" else "semgrep")
+    semgrep_path = str(semgrep_exe) if semgrep_exe.exists() else "semgrep"
 
     cmd = [
-        *semgrep_cmd,
+        semgrep_path,
         "--config", settings.semgrep_config,
         "--json",
         "--timeout", str(settings.semgrep_timeout),
